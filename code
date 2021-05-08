@@ -1,0 +1,272 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[ ]:
+
+
+
+
+
+# In[1]:
+
+
+#The features can be summarized as follows:
+#CRIM: This is the per capita crime rate by town
+#ZN: This is the proportion of residential land zoned for lots larger than 25,000 sq.ft.
+#INDUS: This is the proportion of non-retail business acres per town.
+#CHAS: This is the Charles River dummy variable (this is equal to 1 if tract bounds river; 0 otherwise)
+#NOX: This is the nitric oxides concentration (parts per 10 million)
+#RM: This is the average number of rooms per dwelling
+#AGE: This is the proportion of owner-occupied units built prior to 1940
+#DIS: This is the weighted distances to five Boston employment centers
+#RAD: This is the index of accessibility to radial highways
+#TAX: This is the full-value property-tax rate per $10,000
+#PTRATIO: This is the pupil-teacher ratio by town
+#B: This is calculated as 1000(Bk — 0.63)², where Bk is the proportion of people of African American descent by town
+#LSTAT: This is the percentage lower status of the population
+#MEDV: This is the median value of owner-occupied homes in $1000s
+
+
+# In[2]:
+
+
+conda update ipython
+
+
+# In[53]:
+
+
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+import warnings
+get_ipython().run_line_magic('matplotlip', 'inline')
+warnings.filterwarnings('ignore')
+
+
+# In[54]:
+
+
+df =pd.read_csv("C:\\Users\\Deepanshi\\Downloads\\11BostonHousing.csv")
+df.head()
+
+
+# In[55]:
+
+
+df.describe() ##no missing values
+
+
+# In[56]:
+
+
+df.info()
+
+
+# In[57]:
+
+
+# preprocessing
+df.isnull().sum()
+
+
+# In[58]:
+
+
+#ANALYSIS
+
+
+# In[59]:
+
+
+fig, ax = plt.subplots(ncols=7, nrows=2, figsize=(20, 10))
+index = 0
+ax = ax.flatten()
+
+for col, value in df.items():
+    sns.boxplot(y=col, data=df, ax=ax[index])
+    index += 1
+plt.tight_layout(pad=0.5, w_pad=0.7, h_pad=5.0)
+
+
+# In[60]:
+
+
+# create dist plot
+fig, ax = plt.subplots(ncols=7, nrows=2, figsize=(20, 10))
+index = 0
+ax = ax.flatten()
+
+for col, value in df.items():
+    sns.distplot(value, ax=ax[index])
+    index += 1
+plt.tight_layout(pad=0.5, w_pad=0.7, h_pad=5.0)
+
+
+# In[61]:
+
+
+cols = ['CRIM', 'ZN', 'TAX', 'BLACK']
+for col in cols:
+    # find minimum and maximum of that column
+    minimum = min(df[col])
+    maximum = max(df[col])
+    df[col] = (df[col] - minimum) / (maximum - minimum)
+
+
+# In[62]:
+
+
+fig, ax = plt.subplots(ncols=7, nrows=2, figsize=(20, 10))
+index = 0
+ax = ax.flatten()
+
+for col, value in df.items():
+    sns.distplot(value, ax=ax[index])
+    index += 1
+plt.tight_layout(pad=0.5, w_pad=0.7, h_pad=5.0)
+
+
+# In[63]:
+
+
+from sklearn import preprocessing
+scalar = preprocessing.StandardScaler()
+
+# fit our data
+scaled_cols = scalar.fit_transform(df[cols])
+scaled_cols = pd.DataFrame(scaled_cols, columns=cols)
+scaled_cols.head()
+
+
+# In[64]:
+
+
+for col in cols:
+    df[col] = scaled_cols[col]
+
+
+# In[65]:
+
+
+fig, ax = plt.subplots(ncols=7, nrows=2, figsize=(20, 10))
+index = 0
+ax = ax.flatten()
+
+for col, value in df.items():
+    sns.distplot(value, ax=ax[index])
+    index += 1
+plt.tight_layout(pad=0.5, w_pad=0.7, h_pad=5.0)
+
+
+# In[66]:
+
+
+corr = df.corr()
+plt.figure(figsize=(20,10))
+sns.heatmap(corr, annot=True, cmap='Greys')
+
+
+# In[67]:
+
+
+sns.regplot(y=df['MEDV'], x=df['LSTAT'])
+
+
+# In[68]:
+
+
+sns.regplot(y=df['MEDV'], x=df['RM'])
+
+
+# In[69]:
+
+
+X = df.drop(columns=['MEDV', 'RAD'], axis=1)
+y = df['MEDV']
+
+
+# In[70]:
+
+
+#TRAINING
+
+
+# In[71]:
+
+
+from sklearn.model_selection import cross_val_score, train_test_split
+from sklearn.metrics import mean_squared_error
+def train(model, X, y):
+    # train the model
+    x_train, x_test, y_train, y_test = train_test_split(X, y, random_state=42)
+    model.fit(x_train, y_train)
+    
+    # predict the training set
+    pred = model.predict(x_test)
+    
+    # perform cross-validation
+    cv_score = cross_val_score(model, X, y, scoring='neg_mean_squared_error', cv=5)
+    cv_score = np.abs(np.mean(cv_score))
+    
+    print("Model Report")
+    print("MSE:",mean_squared_error(y_test, pred))
+    print('CV Score:', cv_score)
+
+
+# In[72]:
+
+
+from sklearn.linear_model import LinearRegression
+model = LinearRegression(normalize=True)
+train(model, X, y)
+coef = pd.Series(model.coef_, X.columns).sort_values()
+coef.plot(kind='bar', title='Model Coefficients')
+
+
+# In[73]:
+
+
+from sklearn.tree import DecisionTreeRegressor
+model = DecisionTreeRegressor()
+train(model, X, y)
+coef = pd.Series(model.feature_importances_, X.columns).sort_values(ascending=False)
+coef.plot(kind='bar', title='Feature Importance')
+
+
+# In[74]:
+
+
+from sklearn.ensemble import RandomForestRegressor
+model = RandomForestRegressor()
+train(model, X, y)
+coef = pd.Series(model.feature_importances_, X.columns).sort_values(ascending=False)
+coef.plot(kind='bar', title='Feature Importance')
+
+
+# In[75]:
+
+
+from sklearn.ensemble import ExtraTreesRegressor
+model = ExtraTreesRegressor()
+train(model, X, y)
+coef = pd.Series(model.feature_importances_, X.columns).sort_values(ascending=False)
+coef.plot(kind='bar', title='Feature Importance')
+
+
+# In[76]:
+
+
+import xgboost as xgb
+model = xgb.XGBRegressor()
+train(model, X, y)
+coef = pd.Series(model.feature_importances_, X.columns).sort_values(ascending=False)
+coef.plot(kind='bar', title='Feature Importance')
+
+
+# In[ ]:
+
+
+
+
